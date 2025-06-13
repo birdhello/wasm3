@@ -77,6 +77,15 @@ typedef enum M3ValueType
     c_m3Type_unknown
 } M3ValueType;
 
+typedef enum M3RefType {
+    c_m3Type_funcref = 0x70,
+    c_m3Type_externref = 0x6F,
+} M3RefType;
+
+typedef enum M3VecType {
+    c_m3Type_v128 = 0x7B,
+} M3VecType;
+
 typedef struct M3TaggedValue
 {
     M3ValueType type;
@@ -107,6 +116,7 @@ M3ImportContext, * IM3ImportContext;
 
 struct M3Memory;
 typedef struct M3Memory * IM3Memory;
+struct M3Table;        typedef struct M3Table *       IM3Table;
 
 // 参数 userdata 为 m3_NewRuntime 传入的 userdata
 typedef int (*IM3MemToGrowCallback)(IM3Memory memory, uint32_t pagesToGrow, void *userdata);

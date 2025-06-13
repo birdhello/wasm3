@@ -562,9 +562,9 @@ d_m3Op  (CallIndirect)
 
     m3ret_t r = m3Err_none;
 
-    if (M3_LIKELY(tableIndex < module->table0Size))
+    if (M3_LIKELY(tableIndex < module->numTables))
     {
-        IM3Function function = module->table0 [tableIndex];
+        IM3Function function = module->tables[0].functions[tableIndex];
 
         if (M3_LIKELY(function))
         {
