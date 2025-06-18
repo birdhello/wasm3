@@ -1721,6 +1721,7 @@ _       (PreserveRegisterIfOccupied (o, c_m3Type_i32));
 _   (CompileCallArgsAndReturn (o, & execTop, type, true));
 
 _   (EmitOp         (o, op_CallIndirect));
+    EmitSlotOffset  (o, tableIndex);
     EmitSlotOffset  (o, tableIndexSlot);
     EmitPointer     (o, o->module);
     EmitPointer     (o, type);              // TODO: unify all types in M3Environment

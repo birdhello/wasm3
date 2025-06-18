@@ -10,11 +10,28 @@
 #include "m3_exception.h"
 #include "m3_info.h"
 
-
-M3Result  ParseType_Table  (IM3Module io_module, bytes_t i_bytes, cbytes_t i_end)
+M3Result  ParseType_Table  (IM3Table table, bytes_t *i_bytes, cbytes_t i_end)
 {
     M3Result result = m3Err_none;
 
+    u8 type;
+    u8 flag;
+    u32 initSize, maxSize;
+
+    _(ReadLEB_u7 (&type, i_bytes, i_end));
+    _(ReadLEB_u7 (&flag, i_bytes, i_end));
+    _(ReadLEB_u32 (&initSize, i_bytes, i_end));
+
+    maxSize = 0;
+    if (flag) {
+        _(ReadLEB_u32 (&maxSize, i_bytes, i_end));
+    }
+    table->functions = m3_AllocArray(IM3Function, initSize);
+    _throwifnull(table->functions);
+    table->elements = initSize;
+    table->maxSize = maxSize;
+    table->type = type;
+_catch:
     return result;
 }
 
@@ -34,7 +51,6 @@ _       (ReadLEB_u32 (& o_memory->maxPages, io_bytes, i_end));
 
     _catch: return result;
 }
-
 
 M3Result  ParseSection_Type  (IM3Module io_module, bytes_t i_bytes, cbytes_t i_end)
 {
@@ -178,18 +194,14 @@ _               (Module_AddFunction (io_module, typeIndex, & import))
 
             case d_externalKind_table:
             {
-                i8 waType;
-                u8 flag;
-                u32 initSize, maxSize;
-
-_               (ReadLEB_i7 (& waType, & i_bytes, i_end));
-_               (ReadLEB_u7 (& flag, & i_bytes, i_end));
-_               (ReadLEB_u32 (& initSize, & i_bytes, i_end));
-
-                maxSize = 0;
-                if (flag) {
-_                   (ReadLEB_u32 (& maxSize, & i_bytes, i_end));
-                }
+                u32 numTables = io_module->numTables + 1;
+                io_module->tables = m3_ReallocArray (M3Table, io_module->tables, numTables, io_module->numTables);
+                _throwifnull (io_module->tables);
+                IM3Table table = &io_module->tables[io_module->numTables];
+                io_module->numTables = numTables;
+                ParseType_Table (table, & i_bytes, i_end);
+                table->import = import;
+                import = clearImport;
             }
                 break;
 
@@ -276,6 +288,12 @@ _       (ReadLEB_u32 (& index, & i_bytes, i_end));                              
             _throwif(m3Err_wasmMalformed, index != 0);
             io_module->memoryInfo.exportName = utf8;
             utf8 = NULL; // ownership transferred to M3MemoryInfo
+        }
+        else if (exportKind == d_externalKind_table) {
+            IM3Table table = &(io_module->tables [index]);
+            m3_Free (table->exportName);
+            table->exportName = utf8;
+            utf8 = NULL; // ownership transferred to M3Module
         }
 
         m3_Free (utf8);
@@ -447,6 +465,27 @@ _       (ReadLEB_u32 (& segment->size, & i_bytes, i_end));
     return result;
 }
 
+M3Result  ParseSection_Table  (M3Module * io_module, bytes_t i_bytes, cbytes_t i_end)
+{
+    M3Result result = m3Err_none;
+
+    u32 numTables;
+    _   (ReadLEB_u32 (& numTables, & i_bytes, i_end));                             m3log (parse, "** Table [%d]", numMemories);
+
+    _throwif ("too many tables", numTables > d_m3MaxSaneTableSize);
+
+    numTables += io_module->numTables;
+    io_module->tables = m3_ReallocArray (M3Table, io_module->tables, numTables, io_module->numTables);
+    _throwifnull (io_module->tables);
+
+    for (u32 i = 0; i < numTables; ++i) {
+        ParseType_Table (&io_module->tables[io_module->numTables + i], &i_bytes, i_end);
+    }
+    io_module->numTables = numTables;
+
+_catch: return result;
+}
+
 
 M3Result  ParseSection_Memory  (M3Module * io_module, bytes_t i_bytes, cbytes_t i_end)
 {
@@ -579,7 +618,7 @@ M3Result  ParseModuleSection  (M3Module * o_module, u8 i_sectionType, bytes_t i_
         ParseSection_Type,      // 1
         ParseSection_Import,    // 2
         ParseSection_Function,  // 3
-        NULL,                   // 4: TODO Table
+        ParseSection_Table,     // 4
         ParseSection_Memory,    // 5
         ParseSection_Global,    // 6
         ParseSection_Export,    // 7
@@ -619,6 +658,7 @@ _try {
     module->startFunction = -1;
     //module->hasWasmCodeCopy = false;
     module->environment = i_environment;
+    module->numTables = 0;
 
     const u8 * pos = i_bytes;
     const u8 * end = pos + i_numBytes;

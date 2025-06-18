@@ -40,6 +40,16 @@ M3Memory;
 
 typedef M3Memory *          IM3Memory;
 
+typedef struct M3Table
+{
+    M3RefType               type;
+    u32                     elements;
+    IM3Function *           functions;
+    u32                     maxSize;
+    cstr_t                  exportName;
+    M3ImportInfo            import;
+}
+M3Table;
 
 //---------------------------------------------------------------------------------------------------------------------------------
 
@@ -111,11 +121,11 @@ typedef struct M3Module
     bytes_t                 elementSection;
     bytes_t                 elementSectionEnd;
 
-    IM3Function *           table0;
-    u32                     table0Size;
-
     M3MemoryInfo            memoryInfo;
     bool                    memoryImported;
+
+    M3Table *               tables;
+    u32                     numTables;
 
     //bool                    hasWasmCodeCopy;
 

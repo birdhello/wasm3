@@ -502,6 +502,7 @@ _       (ReadLEB_u32 (& index, & bytes, end));
 
         if (index == 0)
         {
+            IM3Table table = &io_module->tables[0];
             i32 offset;
 _           (EvaluateExpression (io_module, & offset, c_m3Type_i32, & bytes, end));
             _throwif ("table underflow", offset < 0);
@@ -514,12 +515,12 @@ _           (ReadLEB_u32 (& numElements, & bytes, end));
 
             // is there any requirement that elements must be in increasing sequence?
             // make sure the table isn't shrunk.
-            if (endElement > io_module->table0Size)
+            if (endElement > table->elements)
             {
-                io_module->table0 = m3_ReallocArray (IM3Function, io_module->table0, endElement, io_module->table0Size);
-                io_module->table0Size = (u32) endElement;
+                table->functions = m3_ReallocArray (IM3Function, table->functions, endElement, table->elements);
+                table->elements = (u32) endElement;
             }
-            _throwifnull(io_module->table0);
+            _throwifnull(table->functions);
 
             for (u32 e = 0; e < numElements; ++e)
             {
@@ -527,7 +528,7 @@ _           (ReadLEB_u32 (& numElements, & bytes, end));
 _               (ReadLEB_u32 (& functionIndex, & bytes, end));
                 _throwif ("function index out of range", functionIndex >= io_module->numFunctions);
                 IM3Function function = & io_module->functions [functionIndex];      d_m3Assert (function); //printf ("table: %s\n", m3_GetFunctionName(function));
-                io_module->table0 [e + offset] = function;
+                table->functions [e + offset] = function;
             }
         }
         else _throw ("element table index must be zero for MVP");

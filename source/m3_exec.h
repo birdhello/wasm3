@@ -552,7 +552,8 @@ d_m3Op  (Call)
 
 d_m3Op  (CallIndirect)
 {
-    u32 tableIndex              = slot (u32);
+    u32 tableIndex              = immediate (u32);
+    u32 index                   = slot (u32);
     IM3Module module            = immediate (IM3Module);
     IM3FuncType type            = immediate (IM3FuncType);
     i32 stackOffset             = immediate (i32);
@@ -562,34 +563,38 @@ d_m3Op  (CallIndirect)
 
     m3ret_t r = m3Err_none;
 
-    if (M3_LIKELY(tableIndex < module->table0Size))
+    if (M3_LIKELY(tableIndex < module->numTables))
     {
-        IM3Function function = module->table0 [tableIndex];
-
-        if (M3_LIKELY(function))
+        IM3Table table = &module->tables[tableIndex];
+        if (M3_LIKELY(index < table->elements))
         {
-            if (M3_LIKELY(type == function->funcType))
-            {
-                if (M3_UNLIKELY(not function->compiled))
-                    r = CompileFunction (function);
+            IM3Function function = table->functions[index];
 
-                if (M3_LIKELY(not r))
+            if (M3_LIKELY(function)) {
+                if (M3_LIKELY(type == function->funcType))
                 {
-                    r = Call (function->compiled, sp, _mem, d_m3OpDefaultArgs);
-                    _mem = memory->mallocated;
+                    if (M3_UNLIKELY(not function->compiled))
+                        r = CompileFunction (function);
 
                     if (M3_LIKELY(not r))
-                        nextOpDirect ();
-                    else
                     {
-                        pushBacktraceFrame ();
-                        forwardTrap (r);
+                        r = Call (function->compiled, sp, _mem, d_m3OpDefaultArgs);
+                        _mem = memory->mallocated;
+
+                        if (M3_LIKELY(not r))
+                            nextOpDirect ();
+                        else
+                        {
+                            pushBacktraceFrame ();
+                            forwardTrap (r);
+                        }
                     }
                 }
+                else r = m3Err_trapIndirectCallTypeMismatch;
             }
-            else r = m3Err_trapIndirectCallTypeMismatch;
+            else r = m3Err_trapTableElementIsNull;
         }
-        else r = m3Err_trapTableElementIsNull;
+        else r = m3Err_trapElementIndexOutOfRange;
     }
     else r = m3Err_trapTableIndexOutOfRange;
 
